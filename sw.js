@@ -1,7 +1,7 @@
-const CACHE = 'donusum-v1';
+const CACHE = 'donusum-v2';
 const CORE = ['./', './index.html', './css/styles.css', './manifest.webmanifest',
   './js/app.js', './js/db.js', './js/state.js', './js/avatar.js', './js/ui.js', './js/screen-today.js', './js/screen-week.js', './js/screen-plan.js', './js/screen-me.js', './js/planparse.js',
-  './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png'];
+  './vendor/jszip.min.js', './vendor/pdf.min.js', './vendor/pdf.worker.min.js', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));

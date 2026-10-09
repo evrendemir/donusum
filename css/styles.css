@@ -148,7 +148,7 @@ label.fld>span{display:block;font-size:12px;color:var(--muted);font-weight:800;m
 .daytabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .pm{border:2px solid var(--line);border-radius:16px;padding:10px;background:#fff;margin-top:8px}
 .pm .hd{display:flex;align-items:center;gap:8px}
-.pm .hd input[type=time]{width:92px;border:2px solid var(--line);border-radius:10px;padding:4px 6px;font-weight:700;background:#fff}
+.pm .hd input[type=time]{width:108px;border:2px solid var(--line);border-radius:10px;padding:4px 6px;font-weight:700;background:#fff}
 .pm .hd input.nm{flex:1;min-width:0;border:2px solid var(--line);border-radius:10px;padding:6px 8px;font-weight:800;background:#fff}
 .pm textarea{margin-top:8px;font-size:14px}
 .ib{background:none;border:0;color:var(--muted);font-size:20px;min-width:40px;min-height:40px}

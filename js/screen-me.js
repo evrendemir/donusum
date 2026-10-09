@@ -95,7 +95,7 @@ export function buildICS() {
 let zipP = null;
 function loadZip() {
   if (zipP) return zipP;
-  zipP = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = () => res(window.JSZip); s.onerror = () => rej(new Error('JSZip yüklenemedi (internet gerekli)')); document.head.appendChild(s); });
+  zipP = new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'vendor/jszip.min.js'; s.onload = () => res(window.JSZip); s.onerror = () => rej(new Error('JSZip yüklenemedi (internet gerekli)')); document.head.appendChild(s); });
   return zipP;
 }
 async function exportBackup() {

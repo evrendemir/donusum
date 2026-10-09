@@ -38,6 +38,16 @@ await p.waitForSelector('.pm'); await p.click('[data-di="0"]'); await p.waitForT
 await shot('03-plan-parsed');
 const parsed = await p.evaluate(() => [...document.querySelectorAll('.pm textarea')].map(t => t.value));
 console.log('PARSED MONDAY?', JSON.stringify(parsed).slice(0, 300));
+// docx import for next week
+await p.click('[data-w="1"]'); await p.waitForSelector('[data-pdf]');
+const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.click('[data-pdf]')]);
+await fc.setFiles('/tmp/claude-0/-home-claude-donusum/d7ea8740-3e1d-5437-988a-c86f72f07cb6/scratchpad/docx/plan.docx');
+await p.waitForSelector('#ptxt'); await p.click('[data-go]'); await p.waitForSelector('.pm');
+await p.click('[data-di="5"]'); await p.waitForTimeout(200);
+await shot('03b-plan-docx');
+console.log('DOCX SAT:', JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('.pm')].map(x => x.querySelector('.nm').value + ' ' + x.querySelector('[type=time]').value + ' -> ' + x.querySelector('textarea').value.split('\n').length + ' seçenek'))));
+console.log('NOTES:', await p.evaluate(() => document.querySelector('.card .small')?.textContent.slice(0, 120)));
+await p.click('[data-w="-1"]'); await p.waitForTimeout(200);
 await p.click('[data-route=today]');
 await p.waitForSelector('.stage');
 await shot('04-today');

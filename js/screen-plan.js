@@ -1,6 +1,6 @@
 import { S, weekStart, addDays, dkey, dow, DAY_NAMES, DAY_SHORT, MONTHS, newWeekPlan, savePlan, DEFAULT_MEALS } from './state.js';
 import { $, $$, esc, toast, modal, confirmBox } from './ui.js';
-import { parsePlanText, pdfToText } from './planparse.js';
+import { parsePlanText, parsePlanParagraphs, fileToParagraphs } from './planparse.js';
 
 let ws = weekStart(new Date());
 let di = dow(new Date());
@@ -16,12 +16,13 @@ export function renderPlan(root) {
     <div class="row" style="gap:6px"><button class="btn line sm" data-w="-1" style="width:auto">‹</button><button class="btn line sm" data-w="1" style="width:auto">›</button></div></div>
   ${!plan ? `<div class="card focus"><div style="font-weight:800;margin-bottom:6px">Bu hafta için plan yok</div><div class="hint">Diyetisyenin listesini üç yoldan ekleyebilirsin:</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
-      <button class="btn orange" data-pdf>📄 PDF yükle, otomatik ayır</button>
+      <button class="btn orange" data-pdf>📄 PDF / Word yükle, otomatik ayır</button>
       <button class="btn ghost" data-paste>📋 Metin yapıştır</button>
       ${prevKeys.length ? `<button class="btn ghost" data-copyprev>↺ Önceki haftanın planını kopyala</button>` : ''}
       <button class="btn line" data-blank>✎ Boş şablonla elle gir</button>
     </div></div>` : `
-  <div class="row" style="gap:8px;margin-bottom:10px"><button class="btn ghost sm" data-pdf>📄 PDF</button><button class="btn ghost sm" data-paste>📋 Metin</button><button class="btn line sm" data-clear style="width:auto">Sıfırla</button></div>
+  <div class="row" style="gap:8px;margin-bottom:10px"><button class="btn ghost sm" data-pdf>📄 PDF/Word</button><button class="btn ghost sm" data-paste>📋 Metin</button><button class="btn line sm" data-clear style="width:auto">Sıfırla</button></div>
+  ${plan.notes?.length ? `<div class="card" style="margin-bottom:10px;border-color:var(--orange-l)"><div class="label">Diyetisyen notu</div><div class="small" style="margin-top:4px;line-height:1.4">${plan.notes.map(esc).join('<br>')}</div></div>` : ''}
   <div class="daytabs">${days.map((d, i) => `<button class="${i === di ? 'on' : ''}" data-di="${i}">${DAY_SHORT[i]} ${d.getDate()}${plan.days[i]?.some(m => m.options.length) ? ' ·' : ''}</button>`).join('')}</div>
   <div class="sect"><h2>${DAY_NAMES[di]}</h2><span class="small">${plan.days[di].length} öğün</span></div>
   <div id="meals">${plan.days[di].map((m, i) => mealEditor(m, i)).join('')}</div>
@@ -64,9 +65,9 @@ function mealEditor(m, i) {
 }
 
 async function applyParsed(root, wk, text) {
-  const parsed = parsePlanText(text, DEFAULT_MEALS);
+  const parsed = Array.isArray(text) ? parsePlanParagraphs(text, DEFAULT_MEALS) : parsePlanText(text, DEFAULT_MEALS);
   if (!parsed) { toast('Metinde öğün başlığı bulamadım (Kahvaltı, Öğle, Akşam…)'); return; }
-  await savePlan(wk, { days: parsed.days });
+  await savePlan(wk, { days: parsed.days, notes: parsed.notes });
   toast(parsed.single ? 'Tek günlük plan bulundu, 7 güne uygulandı. Kontrol et!' : `${parsed.detected} gün ayrıştırıldı. Kontrol edip düzelt.`, 3500);
   renderPlan(root);
 }
@@ -79,16 +80,17 @@ function importText(root, wk) {
 }
 
 function importPdf(root, wk) {
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/pdf,.pdf';
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.pdf,.docx,.txt,application/pdf';
   inp.onchange = async () => {
     const f = inp.files[0]; if (!f) return;
-    toast('PDF okunuyor…', 4000);
+    toast('Dosya okunuyor…', 4000);
     try {
-      const text = await pdfToText(f);
-      const { el, close } = modal(`<h2 style="font-size:20px;margin-bottom:8px">PDF metni</h2><div class="hint">Çıkan metni kontrol et; gerekirse düzelt, sonra uygula.</div>
+      const paras = await fileToParagraphs(f);
+      const text = paras.map(l => l.replace(/^\u00a7/, 'NOT: ')).join('\n');
+      const { el, close } = modal(`<h2 style="font-size:20px;margin-bottom:8px">Dosyadan çıkan metin</h2><div class="hint">Boş satırlar seçenek gruplarını ayırır. Gerekirse düzelt, sonra uygula.</div>
         <textarea class="txt" id="ptxt" rows="12" style="margin:10px 0">${esc(text)}</textarea><button class="btn orange" data-go>Ayrıştır ve uygula</button>`);
-      el.onclick = async e => { if (e.target.closest('[data-go]')) { const txt = $('#ptxt', el).value; close(); await applyParsed(root, wk, txt); } };
-    } catch (err) { toast('PDF okunamadı: ' + err.message, 4000); }
+      el.onclick = async e => { if (e.target.closest('[data-go]')) { const txt = $('#ptxt', el).value; close(); await applyParsed(root, wk, txt.split(/\n/).map(l => l.replace(/^NOT: /, '\u00a7'))); } };
+    } catch (err) { toast('Dosya okunamadı: ' + err.message, 4000); }
   };
   inp.click();
 }
