@@ -68,7 +68,11 @@ function mealEditor(m, i) {
 }
 
 async function applyParsed(root, wk, text) {
-  const parsed = Array.isArray(text) ? parsePlanParagraphs(text, DEFAULT_MEALS) : parsePlanText(text, DEFAULT_MEALS);
+  let parsed = null;
+  const str = Array.isArray(text) ? text.join('\n') : text;
+  const a = str.indexOf('{'), b = str.lastIndexOf('}');
+  if (a >= 0 && b > a && /"blocks"/.test(str)) { try { const j = JSON.parse(str.slice(a, b + 1)); parsed = buildPlan(j.blocks, j.notes, DEFAULT_MEALS); } catch {} }
+  if (!parsed) parsed = Array.isArray(text) ? parsePlanParagraphs(text, DEFAULT_MEALS) : parsePlanText(text.replace(/^NOT:\s*/gm, '\u00a7'), DEFAULT_MEALS);
   if (!parsed) { toast('Metinde öğün başlığı bulamadım (Kahvaltı, Öğle, Akşam…)'); return; }
   await savePlan(wk, { days: parsed.days, notes: parsed.notes });
   toast(parsed.single ? 'Tek günlük plan bulundu, 7 güne uygulandı. Kontrol et!' : `${parsed.detected} gün ayrıştırıldı. Kontrol edip düzelt.`, 3500);
@@ -76,7 +80,7 @@ async function applyParsed(root, wk, text) {
 }
 
 function importText(root, wk) {
-  const { el, close } = modal(`<h2 style="font-size:20px;margin-bottom:8px">Metin yapıştır</h2><div class="hint">Diyetisyenin WhatsApp/PDF metnini olduğu gibi yapıştır. "Pazartesi", "1. Gün", "Kahvaltı:", "Ara öğün:", "Öğle:", "Akşam:" başlıklarını ve "veya" / "/" ayraçlarını tanır.</div>
+  const { el, close } = modal(`<h2 style="font-size:20px;margin-bottom:8px">Metin yapıştır</h2><div class="hint">Diyetisyenin metnini ya da Claude'un ürettiği metni yapıştır. "Pazartesi", "1. Gün", "Kahvaltı:", "Ara öğün:", "Öğle:", "Akşam:" başlıklarını ve "veya" / "/" ayraçlarını tanır.</div>
     <textarea class="txt" id="ptxt" rows="10" style="margin:10px 0" placeholder="Pazartesi&#10;Kahvaltı: 2 yumurta omlet + salata veya yulaf + süt&#10;Ara öğün: 1 elma + 10 badem&#10;Öğle: ..."></textarea>
     <button class="btn orange" data-go>Ayrıştır ve uygula</button>`);
   el.onclick = async e => { if (e.target.closest('[data-go]')) { const txt = $('#ptxt', el).value; close(); await applyParsed(root, wk, txt); } };
@@ -121,12 +125,26 @@ async function runAI(root, wk, input) {
   } catch (err) { toast(err.message, 5000); }
 }
 
+export const CLAUDE_PROMPT = `Ekteki beslenme programı fotoğrafını (ve/veya metnini) aşağıdaki formatta düz metne çevir. Başka hiçbir şey yazma, sadece bu formatı ver:
+
+- Gün grupları için başlık satırı: "Pazartesi-Cuma" veya "Cumartesi-Pazar" ya da tek gün adı. Program günlere ayrılmamışsa başlık yazma.
+- Her öğün için başlık satırı: "Kahvaltı (08:30):", "Ara öğün (15:00):", "Öğle (12:30):", "Akşam (17:30):" — saat aralığının başlangıcını yaz, saat yoksa parantezi atla. Öğün sadece belirli günlerdeyse başlığa ekle: "Ara öğün (20:00): (Salı, Perşembe)".
+- Öğünün altına birbirinin ALTERNATİFİ olan her seçeneği TEK SATIR olarak yaz ve seçenekler arasında BİR BOŞ SATIR bırak. Seçeneğin birden fazla kalemi varsa " · " ile birleştir (ör. "6 köfte et veya tavuk · Bol salata · 6 yk bulgur"). Satır içindeki "veya"ları koru, ayrı seçenek yapma.
+- Miktarları ve parantez notlarını koru. Okuyamadığın yeri [okunamadı] yaz.
+- Program geneli notları en sona "NOT: ..." satırları olarak yaz.`;
+
 function importPhoto(root, wk) {
   if (!aiReady()) {
-    const { el, close } = modal(`<h2 style="font-size:20px;margin-bottom:8px">Fotoğraftan okuma için AI anahtarı gerekli</h2>
-      <div class="hint">Kâğıttaki programı Claude okuyup günlere yerleştirir. Bunun için bir Anthropic API anahtarı lazım: <b>console.anthropic.com</b> → API Keys → Create Key. Kullandıkça ödenir (bir fotoğraf birkaç kuruş). Anahtar sadece bu telefonda saklanır; fotoğraf okunmak için Anthropic'e gönderilir.</div>
-      <button class="btn orange" data-go style="margin-top:12px">Ben › Yapay zeka ayarına git</button>`);
-    el.onclick = e => { if (e.target.closest('[data-go]')) { close(); document.querySelector('[data-route=me]').click(); } };
+    const { el, close } = modal(`<h2 style="font-size:20px;margin-bottom:8px">Kâğıt programı fotoğraftan okumak</h2>
+      <div class="hint"><b>Ücretsiz yol (Claude aboneliğinle):</b> Talimatı kopyala, Claude uygulamasında yeni sohbet aç, fotoğrafı ekle ve talimatı yapıştır. Claude'un verdiği metni kopyalayıp burada <b>Metin yapıştır</b>'a yapıştır; uygulama günlere yerleştirir.</div>
+      <button class="btn orange" data-copy style="margin-top:10px">📋 Talimatı kopyala</button>
+      <a class="btn blue" href="https://claude.ai/new" target="_blank" rel="noopener" style="margin-top:8px;text-decoration:none">Claude'u aç</a>
+      <button class="btn ghost" data-paste2 style="margin-top:8px">Metin yapıştır</button>
+      <div class="hint" style="margin-top:14px"><b>Otomatik yol (ücretli API):</b> Ben › Yapay zeka'dan bir Anthropic API anahtarı girersen fotoğraf uygulamadan çıkmadan okunur (kullandıkça ödenir, abonelikten ayrı).</div>`);
+    el.onclick = async e => {
+      if (e.target.closest('[data-copy]')) { try { await navigator.clipboard.writeText(CLAUDE_PROMPT); toast('Talimat kopyalandı. Claude\'da fotoğrafla birlikte yapıştır.', 3500); } catch { prompt('Talimatı kopyala:', CLAUDE_PROMPT); } }
+      if (e.target.closest('[data-paste2]')) { close(); importText(root, wk); }
+    };
     return;
   }
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
