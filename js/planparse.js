@@ -82,26 +82,37 @@ export function parsePlanParagraphs(paragraphs, defaults) {
     blocks[0].days = [0, 1, 2, 3, 4, 5, 6].filter(d => !covered.has(d));
     if (!blocks[0].days.length) blocks[0].days = [0, 1, 2, 3, 4, 5, 6];
   }
-  const plan = { days: {}, notes: notes.filter(n => n.length > 3).slice(0, 6) };
+  return buildPlan(blocks, notes, defaults);
+}
+
+/** blocks: [{ days:[0..6], meals:[{ name, type?, time?, onlyDays?, groups?:[[lines]] | options?:[str] }] }] */
+export function buildPlan(blocks, notes, defaults) {
+  if (!blocks || !blocks.length) return null;
+  const plan = { days: {}, notes: (notes || []).map(n => String(n).trim()).filter(n => n.length > 3).slice(0, 8) };
   for (let d = 0; d < 7; d++) plan.days[d] = [];
   for (const b of blocks) {
     const built = [];
     let ara = 0;
-    b.meals.forEach((m, i) => {
-      let options = m.groups.map(g => g.map(clean).filter(Boolean).join(' · ')).filter(Boolean);
-      if (options.length === 1 && m.groups[0].length === 1 && /\s(veya|ya da|\/)\s/i.test(m.groups[0][0])) options = splitOptions(m.groups[0][0]);
-      const time = m.time || (m.type === 'ara' ? (ARA_TIMES[ara] || '21:30') : TIMES[m.name]);
-      if (m.type === 'ara') ara++;
-      built.push({ id: `${m.type === 'ara' ? 'ara' + ara : m.name === 'Kahvaltı' ? 'kahvalti' : m.name === 'Öğle' ? 'ogle' : 'aksam'}_${i}`, name: m.name, type: m.type, time, options, onlyDays: m.onlyDays });
+    (b.meals || []).forEach((m, i) => {
+      const kind = m.type ? { name: m.name, type: m.type } : mealKind(m.name || 'ara');
+      let options;
+      if (m.groups) {
+        options = m.groups.map(g => g.map(clean).filter(Boolean).join(' · ')).filter(Boolean);
+        if (options.length === 1 && m.groups[0].length === 1 && /\s(veya|ya da|\/)\s/i.test(m.groups[0][0])) options = splitOptions(m.groups[0][0]);
+      } else options = (m.options || []).map(o => String(o).replace(/\s+/g, ' ').trim()).filter(Boolean);
+      const time = fmtTime(m.time || '') || m.time && /^\d{2}:\d{2}$/.test(m.time) ? (fmtTime(m.time) || m.time) : (kind.type === 'ara' ? (ARA_TIMES[ara] || '21:30') : TIMES[kind.name]);
+      if (kind.type === 'ara') ara++;
+      built.push({ id: `${kind.type === 'ara' ? 'ara' + ara : kind.name === 'Kahvaltı' ? 'kahvalti' : kind.name === 'Öğle' ? 'ogle' : 'aksam'}_${i}`, name: kind.name, type: kind.type, time, options, onlyDays: Array.isArray(m.onlyDays) && m.onlyDays.length ? m.onlyDays : null });
     });
-    for (const d of b.days) plan.days[d] = built.filter(m => !m.onlyDays || m.onlyDays.includes(d)).map(m => ({ id: m.id, name: m.name, type: m.type, time: m.time, options: [...m.options] }));
+    const days = Array.isArray(b.days) && b.days.length ? b.days.filter(d => d >= 0 && d <= 6) : [0, 1, 2, 3, 4, 5, 6];
+    for (const d of days) plan.days[d] = built.filter(m => !m.onlyDays || m.onlyDays.includes(d)).map(m => ({ id: m.id, name: m.name, type: m.type, time: m.time, options: [...m.options] }));
   }
   for (let d = 0; d < 7; d++) {
     plan.days[d].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     if (!plan.days[d].length && defaults) plan.days[d] = defaults.map(m => ({ ...m, options: [] }));
   }
   plan.detected = blocks.length;
-  plan.single = blocks.length === 1 && blocks[0].days.length === 7;
+  plan.single = blocks.length === 1 && (!blocks[0].days || blocks[0].days.length === 7);
   return plan;
 }
 export function parsePlanText(text, defaults) { return parsePlanParagraphs(text.split(/\r?\n/), defaults); }

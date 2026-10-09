@@ -68,6 +68,20 @@ const lvl = await p.$('.levelup'); if (lvl) await p.click('.levelup button');
 await p.click('[data-route=me]');
 await p.waitForSelector('[data-ics]');
 await shot('07-me');
+// AI photo flow with mocked API
+await p.fill('[name=aiKey]', 'sk-ant-test');
+await p.click('[data-aisave]'); await p.waitForTimeout(300);
+await p.route('https://api.anthropic.com/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: 'İşte JSON:\n```json\n' + JSON.stringify({ blocks: [{ days: [0,1,2,3,4], meals: [{ name: 'Kahvaltı', time: '08.30', options: ['Chia puding', 'Hindi fümeli sandviç'] }, { name: 'Ara öğün', time: '15:00', options: ['Badem + meyve'] }, { name: 'Akşam', time: '17:30', onlyDays: [1, 3], options: ['Baklagil · salata'] }] }, { days: [5, 6], meals: [{ name: 'Kahvaltı', time: '09:30', options: ['Yumurta tabağı'] }] }], notes: ['Her öğünden önce elma sirkesi'] }) + '\n```' }], usage: { input_tokens: 1000, output_tokens: 200 } }) }));
+await p.click('[data-route=plan]'); await p.waitForSelector('[data-photo]');
+await p.click('[data-w="1"]'); await p.waitForTimeout(200);
+const [fc2] = await Promise.all([p.waitForEvent('filechooser'), p.click('[data-photo]')]);
+await fc2.setFiles('icons/icon-512.png');
+await p.waitForSelector('[data-ok]'); await shot('08-ai-preview'); await p.click('[data-ok]'); await p.waitForSelector('.pm');
+await p.click('[data-di="1"]'); await p.waitForTimeout(200);
+console.log('AI TUE:', JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('.pm')].map(x => x.querySelector('.nm').value + ' ' + x.querySelector('[type=time]').value + ' [' + x.querySelector('textarea').value.replace(/\n/g, ' | ') + ']'))));
+await p.click('[data-di="0"]'); await p.waitForTimeout(200);
+console.log('AI MON:', JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('.pm')].map(x => x.querySelector('.nm').value))));
+await p.click('[data-route=me]'); await p.waitForSelector('[data-ics]');
 const ics = await p.evaluate(async () => { const m = await import('./js/screen-me.js'); return m.buildICS().slice(0, 400); });
 console.log('ICS', ics.split('\r\n').slice(0, 8).join(' | '));
 // reload persists?

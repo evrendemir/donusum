@@ -1,6 +1,7 @@
 import { S, saveSettings, load, DAY_SHORT, DAY_NAMES, DEFAULT_MEALS, dkey, levelInfo, totalXP, latestWeight, fmtKg, mealsFor, pad } from './state.js';
 import { db } from './db.js';
 import { $, $$, esc, toast, confirmBox, download, modal } from './ui.js';
+import { AI_MODELS, aiTest } from './ai.js';
 
 export function settingsForm(st, isOnb) {
   return `
@@ -57,6 +58,12 @@ export function renderMe(root, go) {
   <div class="sect"><h2>Ayarlar</h2></div>
   <div class="card" id="setform">${settingsForm(st, false)}<button class="btn orange" data-save>Kaydet</button></div>
 
+  <div class="sect"><h2>Yapay zeka</h2><span class="small">${st.aiKey ? 'bağlı' : 'kapalı'}</span></div>
+  <div class="card" id="aiform"><div class="hint">Kâğıt programın fotoğrafını Claude'a okutup günlere yerleştirmek için. <b>console.anthropic.com</b> → API Keys'ten anahtar al, buraya yapıştır. Kullandıkça ödenir (fotoğraf başına birkaç kuruş); anahtar sadece bu telefonda durur, fotoğraf okunmak için Anthropic'e gider.</div>
+    <label class="fld" style="margin-top:10px"><span>API anahtarı</span><input class="txt" name="aiKey" type="password" autocomplete="off" value="${esc(st.aiKey || '')}" placeholder="sk-ant-…"></label>
+    <label class="fld"><span>Model</span><select class="txt" name="aiModel">${AI_MODELS.map(m => `<option value="${m.id}" ${(st.aiModel || AI_MODELS[0].id) === m.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
+    <div class="grid2"><button class="btn line" data-aitest>Bağlantıyı test et</button><button class="btn blue" data-aisave>Kaydet</button></div></div>
+
   <div class="sect"><h2>Yedek</h2></div>
   <div class="card"><div class="hint">Tüm veriler sadece bu telefonda. Arada bir yedek al ve iCloud Drive'a kaydet; telefon değişince geri yüklersin.</div>
     <div class="grid2" style="margin-top:10px"><button class="btn green" data-export>⬇︎ Yedek al (.zip)</button><button class="btn line" data-import>⬆︎ Geri yükle</button></div></div>
@@ -68,6 +75,8 @@ export function renderMe(root, go) {
   root.onclick = async e => {
     const t = e.target;
     if (t.closest('[data-save]')) { const s = readSettingsForm($('#setform', root), st); if (!s) return toast('Başlangıç kilosu geçersiz'); await saveSettings(s); toast('Kaydedildi'); return renderMe(root, go); }
+    if (t.closest('[data-aisave]')) { const k = $('[name=aiKey]', root).value.trim(); await saveSettings({ ...S.settings, aiKey: k, aiModel: $('[name=aiModel]', root).value }); toast(k ? 'AI anahtarı kaydedildi' : 'AI kapatıldı'); return renderMe(root, go); }
+    if (t.closest('[data-aitest]')) { await saveSettings({ ...S.settings, aiKey: $('[name=aiKey]', root).value.trim(), aiModel: $('[name=aiModel]', root).value }); toast('Test ediliyor…'); try { await aiTest(); toast('Bağlantı tamam ✓'); } catch (e) { toast('Olmadı: ' + e.message, 4000); } return; }
     if (t.closest('[data-ics]')) return download('donusum-hatirlatici.ics', new Blob([buildICS()], { type: 'text/calendar' }));
     if (t.closest('[data-export]')) return exportBackup();
     if (t.closest('[data-import]')) return importBackup(go);
